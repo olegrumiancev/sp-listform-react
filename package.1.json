@@ -1,0 +1,33 @@
+{
+  "name": "sppp-list-form",
+  "version": "1.0.0",
+  "description": "Universal Office UI Fabric React-based list form for SharePoint lists",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "gulp build",
+    "watch": "gulp watch",
+    "config": "gulp config:force",
+    "publish": "gulp push:diff",
+    "analyze": "gulp analyze",
+    "rebuild": "gulp build & gulp push"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@olegrumiancev/sp-react-formfields": "git+https://github.com/olegrumiancev/sp-react-formfields.git",
+    "@pnp/common": "^1.0.5",
+    "@pnp/logging": "^1.0.5",
+    "@pnp/odata": "^1.0.5",
+    "@pnp/sp": "^1.0.5",
+    "office-ui-fabric-react": "^5.100.0",
+    "react": "^16.3.2",
+    "react-dom": "^16.3.2"
+  },
+  "devDependencies": {
+    "@types/react": "^16.3.13",
+    "@types/sharepoint": "^2016.1.0",
+    "eslint-config-standard": "^11.0.0",
+    "sp-build-tasks": "^2.0.2",
+    "tslint-config-standard": "^7.0.0"
+  }
+}

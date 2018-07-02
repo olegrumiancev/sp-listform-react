@@ -1,0 +1,28 @@
+// Here goes your awesome SCSS
+//@import '~@microsoft/sp-office-ui-fabric-core/dist/sass/SPFabricCore.scss';
+
+.formContainer {
+  max-width: 800px;
+  margin: 0 auto;
+
+  .formHeader {
+    font-size: 2em;
+  }
+
+  .formRow {
+    padding: 10px;
+  }
+
+  .rowLabel {
+    display: inline-block;
+    font-weight: bold;
+    min-width: 340px;
+  }
+
+  .rowField {
+    padding: 5px;
+    display: block;
+    width: 100%;
+  }
+}
+

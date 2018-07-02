@@ -1,0 +1,5 @@
+{
+  "$schema": "../node_modules/sp-build-tasks/schema/v1/sppp.json",
+  "spFolder": "_catalogs/masterpage/sppp-listform",
+  "distFolder": "./dist"
+}
