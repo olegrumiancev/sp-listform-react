@@ -1,5 +1,4 @@
 import { SPRest, AttachmentFileInfo } from '@pnp/sp';
-import { IPersonaProps } from 'office-ui-fabric-react/lib/Persona';
 import { BaseFieldRenderer } from './fields';
 
 export interface IFormMode {
@@ -42,7 +41,7 @@ export interface IFormManagerActions {
   addNewAttachmentInfo(fileInfo: any): void;
   removeNewAttachmentInfo(fileInfo: any): void;
   addOrRemoveExistingAttachmentDeletion(attachmentName: string): void;
-  getFieldControlValuesForPost(): Object;
+  getFieldControlValuesForPost(): Promise<Object>;
   getNewAttachmentsToSave(): Promise<AttachmentFileInfo[]>;
   clearHelperAttachmentProperties(): void;
   saveFormData(): Promise<ISaveItemResult>;
@@ -69,6 +68,7 @@ export interface ISaveItemResult {
   Error?: string;
   ItemId: number;
   RestObject: object;
+  ETag: string;
 }
 
 export interface IFieldProps {
@@ -94,12 +94,17 @@ export interface IFieldProps {
   TaxonomyTermSetId?: string;
   TaxonomyAnchorId?: string;
   TaxonomyIsOpen?: boolean;
+  TaxonomyUpdateFieldEntityPropertyName?: string;
   UserSelectionMode?: string;
   NumberIsPercent?: boolean;
   DateTimeIsTimePresent?: boolean;
+  CurrencyLocaleId?: number;
+  UrlRenderAsPicture?: boolean;
   AttachmentsNewToAdd?: any[];
   AttachmentsExistingToDelete?: any[];
   CurrentMode: number;
+  CurrentListId: string;
+  ShowValidationErrors: boolean;
   pnpSPRest: SPRest;
   Validators?: Function[];
   IsValid?: boolean;

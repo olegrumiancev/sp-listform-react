@@ -1,111 +1,54 @@
-/**
- * DISCLAIMER
- *
- * As there is not yet an OData end-point for managed metadata, this service makes use of the ProcessQuery end-points.
- * The service will get updated once the APIs are in place for managing managed metadata.
- */
-
 import * as Taxonomy from '@pnp/sp-taxonomy';
-import { IPickerTerms, IPickerTerm } from './interfaces';
-import * as TermService from './ISPTermStorePickerService';
+import { IPickerTerms, IPickerTerm, IPickerTermSet } from './interfaces';
 import { IFieldProps } from '../../interfaces';
+import { registerDefaultFontFaces } from '@uifabric/styling/lib';
 
-/**
- * Service implementation to manage term stores in SharePoint
- */
 export default class SPTermStorePickerService {
-  // private taxonomySession: string;
-  // private formDigest: string;
-  // private clientServiceUrl: string;
-
-  /**
-   * Service constructor
-   */
   constructor(private props: IFieldProps) {
     // this.clientServiceUrl = this.context.pageContext.web.absoluteUrl + '/_vti_bin/client.svc/ProcessQuery';
   }
 
-  /**
-   * Gets the collection of term stores in the current SharePoint env
-   */
-  public getTermStores(): Promise<TermService.ITermStore[]> {
-    let result = new Promise<TermService.ITermStore[]>(async (resolve) => {
-      let termStores: TermService.ITermStore[] = [];
-      let siteCollTermStore = await Taxonomy.taxonomy.getDefaultSiteCollectionTermStore().get();
-      let tStore = {
-        Id: siteCollTermStore.Id,
-        Name: siteCollTermStore.Name
-      } as TermService.ITermStore;
-      let groupSiteColl = await siteCollTermStore.getSiteCollectionGroup(false).get();
-      if (groupSiteColl) {
-        tStore.Groups = {
-          _Child_Items_: [],
-          _ObjectType_: 'Groups'
-        };
+  public async getAllTerms(termsetId: string): Promise<IPickerTermSet> {
+    let termSet: Taxonomy.ITermSetData & Taxonomy.ITermSet =
+      await Taxonomy.taxonomy.getDefaultSiteCollectionTermStore().getTermSetById(termsetId)
+        .usingCaching()
+        .get();
+    let result: IPickerTermSet = null;
+    if (termSet) {
+      result = {
+        Id: termsetId,
+        Name: termSet.Name,
+        Description: termSet.Description,
+        CustomSortOrder: termSet.CustomSortOrder
+      };
 
-        let transformedTermSets: TermService.ITermSet[] = [];
-        tStore.Groups._Child_Items_.push({
-          Id: groupSiteColl.Id,
-          IsSystemGroup: groupSiteColl.IsSystemGroup,
-          Name: groupSiteColl.Name,
-          TermSets: {
-            _Child_Items_: transformedTermSets
-          } as TermService.ITermSets,
-          _ObjectType_: 'Group',
-          _ObjectIdentity_: ''
-        });
-
-        let termSets: (Taxonomy.ITermSetData & Taxonomy.ITermSet)[] = await groupSiteColl.termSets.get();
-        if (termSets) {
-          transformedTermSets.push(...termSets.map(ts => {
-            return {
-              Id: ts.Id,
-              Description: ts.Description,
-              Name: ts.Name,
-              Names: ts.Names,
-              _ObjectType_: 'TermSet',
-              _ObjectIdentity_: ''
-            } as TermService.ITermSet;
-          }));
-        }
-      }
-
-      termStores.push(tStore);
-      resolve(termStores);
-    });
-    return result;
-  }
-
-  /**
-   * Gets the current term set
-   */
-  public async getTermSet(): Promise<TermService.ITermSet> {
-    const termStore = await this.getTermStores();
-    return this.getTermSetId(termStore, this.props.TaxonomyTermSetId);
-  }
-
-  /**
-   * Retrieve all terms for the given term set
-   * @param termset
-   */
-  public async getAllTerms(termsetId: string): Promise<IPickerTerm[]> {
-    // let termsetId: string = termset;
-    let result = new Promise<IPickerTerm[]>(async resolve => {
-      let retrievedTerms: (Taxonomy.ITermData & Taxonomy.ITerm)[] = await Taxonomy.taxonomy.getDefaultSiteCollectionTermStore().getTermSetById(termsetId).terms.get();
+      let retrievedTerms: any[] =
+        await Taxonomy.taxonomy.getDefaultSiteCollectionTermStore().getTermSetById(termsetId)
+          .terms
+          .select('Id', 'Name', 'PathOfTerm', 'IsDeprecated', 'Parent', 'CustomSortOrder')
+          .usingCaching()
+          .get();
       if (retrievedTerms) {
-        let toReturn = retrievedTerms.map(rt => {
+        // console.log(retrievedTerms);
+        result.Terms = retrievedTerms.map(rt => {
           return {
-            key: rt.Id,
+            key: this.cleanGuid(rt.Id),
+            parentId: rt.Parent ? this.cleanGuid(rt.Parent.Id) : null,
+            customSortOrder: rt.CustomSortOrder ? rt.CustomSortOrder : null,
             name: rt.Name,
             path: rt.PathOfTerm,
-            termSet: termsetId
+            pathDepth: rt.PathOfTerm ? rt.PathOfTerm.split(';').length : 1,
+            termSet: termsetId,
+            termSetName: result.Name,
+            isDeprecated: rt.IsDeprecated
           } as IPickerTerm;
         });
-        resolve(toReturn);
+        // result.Terms = result.Terms.sort(this.sortTerms);
+        // console.log(result.Terms);
       }
-      resolve(null);
-    });
-    return result;
+    }
+
+    return this.sortTermsInTermSetByHierarchy(result);
   }
 
   /**
@@ -133,28 +76,28 @@ export default class SPTermStorePickerService {
    * @param termstore
    * @param termset
    */
-  private getTermSetId(termstore: TermService.ITermStore[], termsetName: string): TermService.ITermSet {
-    if (termstore && termstore.length > 0 && termsetName) {
-      // Get the first term store
-      const ts = termstore[0];
-      // Check if the term store contains groups
-      if (ts.Groups && ts.Groups._Child_Items_) {
-        for (const group of ts.Groups._Child_Items_) {
-          // Check if the group contains term sets
-          if (group.TermSets && group.TermSets._Child_Items_) {
-            for (const termSet of group.TermSets._Child_Items_) {
-              // Check if the term set is found
-              if (termSet.Name === termsetName) {
-                return termSet;
-              }
-            }
-          }
-        }
-      }
-    }
+  // private getTermSetId(termstore: TermService.ITermStore[], termsetName: string): TermService.ITermSet {
+  //   if (termstore && termstore.length > 0 && termsetName) {
+  //     // Get the first term store
+  //     const ts = termstore[0];
+  //     // Check if the term store contains groups
+  //     if (ts.Groups && ts.Groups._Child_Items_) {
+  //       for (const group of ts.Groups._Child_Items_) {
+  //         // Check if the group contains term sets
+  //         if (group.TermSets && group.TermSets._Child_Items_) {
+  //           for (const termSet of group.TermSets._Child_Items_) {
+  //             // Check if the term set is found
+  //             if (termSet.Name === termsetName) {
+  //               return termSet;
+  //             }
+  //           }
+  //         }
+  //       }
+  //     }
+  //   }
 
-    return null;
-  }
+  //   return null;
+  // }
 
   /**
    * Searches terms for the given term set
@@ -164,7 +107,7 @@ export default class SPTermStorePickerService {
   private searchTermsByTermSet(searchText: string, termSetId: string, termLimit: number = 10): Promise<IPickerTerm[]> {
     return new Promise<IPickerTerm[]>(async resolve => {
       let allTerms = await this.getAllTerms(termSetId);
-      let filteredTerms = allTerms.filter(t => t.name.match(new RegExp(searchText, 'gi')));
+      let filteredTerms = allTerms.Terms.filter(t => t.name.match(new RegExp(searchText, 'gi')));
       if (filteredTerms.length > termLimit) {
         filteredTerms = filteredTerms.slice(0, termLimit - 1);
       }
@@ -181,13 +124,63 @@ export default class SPTermStorePickerService {
    * @param a term 2
    * @param b term 2
    */
-  private _sortTerms(a: TermService.ITerm, b: TermService.ITerm) {
-    if (a.PathOfTerm < b.PathOfTerm) {
-      return -1;
+  // private sortTerms(a: IPickerTerm, b: IPickerTerm) {
+  //   if (a.pathDepth < b.pathDepth) {
+  //     return -1;
+  //   }
+  //   if (a.pathDepth > b.pathDepth) {
+  //     return 1;
+  //   }
+  //   return 0;
+  // }
+
+  private sortTermsInTermSetByHierarchy(termSet: IPickerTermSet): IPickerTermSet {
+    if (!termSet) {
+      return termSet;
     }
-    if (a.PathOfTerm > b.PathOfTerm) {
-      return 1;
+
+    let mockRootLevelTerm: IPickerTerm = {
+      key: null,
+      name: '',
+      customSortOrder: termSet.CustomSortOrder,
+      isDeprecated: false,
+      parentId: null,
+      path: '',
+      pathDepth: 0,
+      termSet: ''
+    };
+
+    // debugger;
+    let sortedTerms: IPickerTerm[] = [];
+    let toProcess = this.getSortedTermsForAParent(termSet.Terms, mockRootLevelTerm);
+    while (toProcess.length > 0) {
+      let item = toProcess[0];
+      sortedTerms.push(item);
+      let currentItemChildren = this.getSortedTermsForAParent(termSet.Terms, item);
+      if (currentItemChildren.length > 0) {
+        toProcess.splice(0, 1, ...currentItemChildren);
+      } else {
+        toProcess.splice(0, 1);
+      }
     }
-    return 0;
+    termSet.Terms = sortedTerms;
+    return termSet;
+  }
+
+  private getSortedTermsForAParent(allUnsortedTerms: IPickerTerm[], parentPickerTerm: IPickerTerm): IPickerTerm[] {
+    let results = allUnsortedTerms.filter(f => f.parentId === parentPickerTerm.key);
+    if (parentPickerTerm.customSortOrder) {
+      const orderedTermIds = parentPickerTerm.customSortOrder.split(':');
+      let sortedResults = [];
+      for (let id of orderedTermIds) {
+        const res = results.filter(r => r.key === id);
+        if (res.length > 0) {
+          sortedResults.push(res[0]);
+        }
+      }
+      return sortedResults;
+    } else {
+      return results;
+    }
   }
 }

@@ -7,6 +7,7 @@
       "ignore-interfaces"
     ],
     "space-before-function-paren": false,
-    "radix": false
+    "radix": false,
+    "no-unsafe-finally": false
   }
 }

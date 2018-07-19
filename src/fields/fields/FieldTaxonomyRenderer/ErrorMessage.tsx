@@ -1,5 +1,4 @@
 import * as React from 'react';
-import styles from './TaxonomyPicker.module.scss';
 import { Icon } from 'office-ui-fabric-react/lib/Icon';
 
 export interface IFieldErrorMessageProps {
@@ -14,8 +13,8 @@ export default class FieldErrorMessage extends React.Component<IFieldErrorMessag
     if (this.props.errorMessage !== 'undefined' && this.props.errorMessage !== null && this.props.errorMessage !== '') {
       return (
         <div aria-live='assertive'>
-          <p className={`ms-TextField-errorMessage ${styles.errorMessage}`}>
-            <Icon iconName='Error' className={styles.errorIcon} />
+          <p className={`ms-TextField-errorMessage ${'errorMessage'}`}>
+            <Icon iconName='Error' className={`errorIcon`} />
             <span data-automation-id='error-message'>{this.props.errorMessage}</span>
           </p>
         </div>

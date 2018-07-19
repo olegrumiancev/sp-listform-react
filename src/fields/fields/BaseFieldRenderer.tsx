@@ -3,7 +3,6 @@ import { IFieldProps, FormMode, IFormManagerProps } from '../interfaces';
 import { FormFieldsStore } from '../store';
 import ErrorBoundary from '../ErrorBoundary';
 import { ValidationManager } from '../managers/ValidationManager';
-import { getFieldPropsByInternalName } from '../utils';
 
 export class BaseFieldRenderer extends React.Component<IFieldProps, any> {
   public constructor(props: IFieldProps) {
@@ -25,25 +24,39 @@ export class BaseFieldRenderer extends React.Component<IFieldProps, any> {
   }
 
   public render() {
-    const globalState = FormFieldsStore.actions.getState();
-    const fieldProps = getFieldPropsByInternalName(globalState.Fields, this.props.InternalName);
-
     return (
       <React.Fragment>
-        <FormFieldsStore.Consumer mapStateToProps={(state: IFormManagerProps) => (state)}>
-          {(consumerState) => {
-            return (
-              <ErrorBoundary>
-                {consumerState.CurrentMode === FormMode.New ? this.renderNewForm() : null}
-                {consumerState.CurrentMode === FormMode.Edit ? this.renderEditForm() : null}
-                {consumerState.CurrentMode === FormMode.Display ? this.renderDispForm() : null}
-              </ErrorBoundary>);
-          }}
-        </FormFieldsStore.Consumer>
-        {globalState.ShowValidationErrors && !fieldProps.IsValid ? this.renderValidationErrors(fieldProps.ValidationErrors) : null}
+        <ErrorBoundary>
+          {this.props.CurrentMode === FormMode.New ? this.renderNewForm(this.props) : null}
+          {this.props.CurrentMode === FormMode.Edit ? this.renderEditForm(this.props) : null}
+          {this.props.CurrentMode === FormMode.Display ? this.renderDispForm(this.props) : null}
+        </ErrorBoundary>
+        {this.props.ShowValidationErrors && !this.props.IsValid ? this.renderValidationErrors(this.props.ValidationErrors) : null}
       </React.Fragment>
     );
   }
+
+  // public render() {
+  //   const globalState = FormFieldsStore.actions.getState();
+  //   const fieldProps = getFieldPropsByInternalName(globalState.Fields, this.props.InternalName);
+
+  //   return (
+  //     <React.Fragment>
+  //       <FormFieldsStore.Consumer mapStateToProps={(state: IFormManagerProps) => (state)}>
+  //         {(consumerState: IFormManagerProps) => {
+  //           const fieldProps = consumerState.Fields.filter(f => f.InternalName === this.props.InternalName)[0];
+  //           return (
+  //             <ErrorBoundary>
+  //               {consumerState.CurrentMode === FormMode.New ? this.renderNewForm(fieldProps) : null}
+  //               {consumerState.CurrentMode === FormMode.Edit ? this.renderEditForm(fieldProps) : null}
+  //               {consumerState.CurrentMode === FormMode.Display ? this.renderDispForm(fieldProps) : null}
+  //             </ErrorBoundary>);
+  //         }}
+  //       </FormFieldsStore.Consumer>
+  //       {globalState.ShowValidationErrors && !fieldProps.IsValid ? this.renderValidationErrors(fieldProps.ValidationErrors) : null}
+  //     </React.Fragment>
+  //   );
+  // }
 
   public setFieldMode(mode: number) {
     this.setState({ currentMode: mode }, () => {
@@ -67,16 +80,16 @@ export class BaseFieldRenderer extends React.Component<IFieldProps, any> {
     return this.state.valueForSaving;
   }
 
-  protected renderNewForm() {
-    return (<div>+ Not implemented, field type: {this.props.Type}, form mode: new</div>);
+  protected renderNewForm(props: IFieldProps) {
+    return (<div>+ Not implemented, field type: {props.Type}, form mode: new</div>);
   }
 
-  protected renderEditForm() {
-    return (<div>+ Not implemented, field type: {this.props.Type}, form mode: edit</div>);
+  protected renderEditForm(props: IFieldProps) {
+    return (<div>+ Not implemented, field type: {props.Type}, form mode: edit</div>);
   }
 
-  protected renderDispForm() {
-    return (<div>++ Not implemented, field type: {this.props.Type}, form mode: disp</div>);
+  protected renderDispForm(props: IFieldProps) {
+    return (<div>++ Not implemented, field type: {props.Type}, form mode: disp</div>);
   }
 
   protected renderValidationErrors(validationErrors: string[]) {

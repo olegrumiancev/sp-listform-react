@@ -1,21 +1,36 @@
 import { sp, SPRest, List, AttachmentFileInfo, ItemUpdateResult, ItemAddResult } from '@pnp/sp';
-import { initStore } from 'react-waterfall';
+import createStore from 'react-waterfall';
 import { IFormManagerProps, FormMode, IFieldProps, ISaveItemResult, IFormManagerActions } from './interfaces';
 import { handleError, getFieldPropsByInternalName } from './utils';
 import { FieldPropsManager } from './managers/FieldPropsManager';
 import * as React from 'react';
 import { ValidationManager } from './managers/ValidationManager';
 import { enhanceProvider } from './EnhancedProvider';
+// const deasync = require('deasync');
+// const deasync = require('synchronize');
 
-const store = {
+let exposedState: IFormManagerProps = null;
+
+const configurePnp = (webUrl: string) => {
+  sp.setup({
+    sp: {
+      headers: {
+        Accept: 'application/json;odata=verbose'
+      },
+      baseUrl: webUrl
+    }
+  });
+};
+
+const storeConfig = {
   initialState: {
     SPWebUrl: null,
     CurrentMode: 0,
     CurrentListId: null,
     IsLoading: true
   } as IFormManagerProps,
-  actions: {
-    initStore: async (state: IFormManagerProps, sPWebUrl: string, currentListId: string, currentMode: number, currentItemId?: number): Promise<IFormManagerProps> => {
+  actionsCreators: {
+    initStore: async (state: IFormManagerProps, actions: IFormManagerActions, sPWebUrl: string, currentListId: string, currentMode: number, currentItemId?: number): Promise<IFormManagerProps> => {
       configurePnp(sPWebUrl);
 
       let list = sp.web.lists.getById(currentListId);
@@ -50,18 +65,24 @@ const store = {
         let item = await itemMetadata.select(...toSelect).expand(...toExpand).get();
         eTag = item.__metadata.etag;
         let attachmentMetadata = await itemMetadata.attachmentFiles.get();
-        // console.log(item);
-        fieldInfos = listFields.map(fm => {
-          return FieldPropsManager.createFieldRendererPropsFromFieldMetadata(fm, currentMode, item, sp);
-        });
+        console.log(item);
+        for (const fm of listFields) {
+          fieldInfos.push(await FieldPropsManager.createFieldRendererPropsFromFieldMetadata(fm, currentMode, currentListId, item, sp));
+        }
+        // fieldInfos = listFields.map(fm => {
+        //   return await FieldPropsManager.createFieldRendererPropsFromFieldMetadata(fm, currentMode, item, sp);
+        // });
         if (item.Attachments) {
           // console.log(attachmentMetadata);
           fieldInfos.filter(f => f.InternalName === 'Attachments')[0].FormFieldValue = attachmentMetadata;
         }
       } else {
-        fieldInfos = listFields.map(fm => {
-          return FieldPropsManager.createFieldRendererPropsFromFieldMetadata(fm, currentMode, null, sp);
-        });
+        // fieldInfos = listFields.map(fm => {
+        //   return FieldPropsManager.createFieldRendererPropsFromFieldMetadata(fm, currentMode, null, sp);
+        // });
+        for (const fm of listFields) {
+          fieldInfos.push(await FieldPropsManager.createFieldRendererPropsFromFieldMetadata(fm, currentMode, currentListId, null, sp));
+        }
       }
 
       return {
@@ -76,39 +97,49 @@ const store = {
         ETag: eTag
       } as IFormManagerProps;
     },
-    setFormMode: (state: IFormManagerProps, mode: number) => {
+    setFormMode: async (state: IFormManagerProps, actions: IFormManagerActions, mode: number) => {
+      console.log(state);
+
       state.CurrentMode = mode;
       state.Fields.forEach(f => f.CurrentMode = mode);
-      return state;
+      return { ...state };
     },
-    setItemId: (state: IFormManagerProps, itemId: number) => {
+    setItemId: async (state: IFormManagerProps, actions: IFormManagerActions, itemId: number) => {
       state.CurrentItemId = itemId;
-      return state;
+      return { ...state };
     },
-    setLoading: (state: IFormManagerProps, isLoading: boolean) => {
+    setLoading: async (state: IFormManagerProps, actions: IFormManagerActions, isLoading: boolean) => {
       state.IsLoading = isLoading;
-      return state;
+      return { ...state };
     },
-    setShowValidationErrors: (state: IFormManagerProps, show: boolean) => {
+    setEtag: async (state: IFormManagerProps, actions: IFormManagerActions, etag: string) => {
+      state.ETag = etag;
+      return { ...state };
+    },
+    setShowValidationErrors: async (state: IFormManagerProps, actions: IFormManagerActions, show: boolean) => {
       state.ShowValidationErrors = show;
-      return state;
+      state.Fields = state.Fields.map(f => {
+        f.ShowValidationErrors = show;
+        return f;
+      });
+      return { ...state };
     },
-    setFieldData: (state: IFormManagerProps, internalName: string, newValue: any) => {
+    setFieldData: async (state: IFormManagerProps, actions: IFormManagerActions, internalName: string, newValue: any) => {
       let fieldProps = getFieldPropsByInternalName(state.Fields, internalName);
       if (fieldProps) {
         fieldProps.FormFieldValue = newValue;
       }
-      return state;
+      return { ...state };
     },
-    setFieldValidationState: (state: IFormManagerProps, internalName: string, isValid: boolean, validationErrors: string[]) => {
+    setFieldValidationState: async (state: IFormManagerProps, actions: IFormManagerActions, internalName: string, isValid: boolean, validationErrors: string[]) => {
       let fieldProps = getFieldPropsByInternalName(state.Fields, internalName);
       if (fieldProps) {
         fieldProps.IsValid = isValid;
         fieldProps.ValidationErrors = validationErrors;
       }
-      return state;
+      return { ...state };
     },
-    addNewAttachmentInfo: (state: IFormManagerProps, fileInfo: any) => {
+    addNewAttachmentInfo: async (state: IFormManagerProps, actions: IFormManagerActions, fileInfo: any) => {
       let attachmentProps = getFieldPropsByInternalName(state.Fields, 'Attachments');
       if (attachmentProps) {
         if (!attachmentProps.AttachmentsNewToAdd) {
@@ -116,16 +147,16 @@ const store = {
         }
         attachmentProps.AttachmentsNewToAdd.push(fileInfo);
       }
-      return state;
+      return { ...state };
     },
-    removeNewAttachmentInfo: (state: IFormManagerProps, fileInfo: any) => {
+    removeNewAttachmentInfo: async (state: IFormManagerProps, actions: IFormManagerActions, fileInfo: any) => {
       let attachmentProps = getFieldPropsByInternalName(state.Fields, 'Attachments');
       if (attachmentProps && attachmentProps.AttachmentsNewToAdd) {
         attachmentProps.AttachmentsNewToAdd = attachmentProps.AttachmentsNewToAdd.filter(a => a.name !== fileInfo.name);
       }
-      return state;
+      return { ...state };
     },
-    addOrRemoveExistingAttachmentDeletion: (state: IFormManagerProps, attachmentName: string) => {
+    addOrRemoveExistingAttachmentDeletion: async (state: IFormManagerProps, actions: IFormManagerActions, attachmentName: string) => {
       let attachmentProps = getFieldPropsByInternalName(state.Fields, 'Attachments');
       if (!attachmentProps.AttachmentsExistingToDelete) {
         attachmentProps.AttachmentsExistingToDelete = [];
@@ -138,24 +169,24 @@ const store = {
       }
 
       // console.log(state);
-      return state;
+      return { ...state };
     },
-    clearHelperAttachmentProperties: (state: IFormManagerProps) => {
+    clearHelperAttachmentProperties: async (state: IFormManagerProps) => {
       let attachmentProps = getFieldPropsByInternalName(state.Fields, 'Attachments');
       if (attachmentProps) {
         attachmentProps.AttachmentsExistingToDelete = null;
         attachmentProps.AttachmentsNewToAdd = null;
       }
-      return state;
+      return { ...state };
     },
-    setFieldPropValue: (state: IFormManagerProps, internalName: string, propName: string, propValue: any) => {
+    setFieldPropValue: async (state: IFormManagerProps, actions: IFormManagerActions, internalName: string, propName: string, propValue: any) => {
       let fieldProps = getFieldPropsByInternalName(state.Fields, internalName);
       if (fieldProps) {
         fieldProps[propName] = propValue;
       }
-      return state;
+      return { ...state };
     },
-    addValidatorToField: (state: IFormManagerProps, validator: Function, internalName: string, ...validatorParams: any[]) => {
+    addValidatorToField: async (state: IFormManagerProps, actions: IFormManagerActions, validator: Function, internalName: string, ...validatorParams: any[]) => {
       let fieldProps = getFieldPropsByInternalName(state.Fields, internalName);
       if (fieldProps) {
         if (!fieldProps.Validators) {
@@ -166,16 +197,16 @@ const store = {
           return validator(internalName, ...validatorParams);
         });
       }
-      return state;
+      return { ...state };
     },
-    clearValidatorsFromField: (state: IFormManagerProps, internalName: string) => {
+    clearValidatorsFromField: async (state: IFormManagerProps, actions: IFormManagerActions, internalName: string) => {
       let fieldProps = getFieldPropsByInternalName(state.Fields, internalName);
       if (fieldProps) {
         fieldProps.Validators = [];
       }
-      return state;
+      return { ...state };
     },
-    validateForm: (state: IFormManagerProps) => {
+    validateForm: async (state: IFormManagerProps) => {
       // debugger;
       if (state.Fields) {
         state.Fields.forEach(f => {
@@ -184,9 +215,9 @@ const store = {
           f.ValidationErrors = result.ValidationErrors;
         });
       }
-      return state;
+      return { ...state };
     },
-    setFormMessage: (state: IFormManagerProps, message: string, callback: (globalState: IFormManagerProps) => void) => {
+    setFormMessage: async (state: IFormManagerProps, actions: IFormManagerActions, message: string, callback: (globalState: IFormManagerProps) => void) => {
       if (message === null || message === '') {
         state.GlobalMessage = null;
       } else {
@@ -195,15 +226,24 @@ const store = {
           DialogCallback: callback
         };
       }
-      return state;
+      return { ...state };
     }
   }
 };
 
-const initedStore = initStore(store);
+// const initedStore = initStore(storeConfig);
+const initedStore = createStore(storeConfig);
 
-const getFieldControlValuesForPost = (): Object => {
-  const state = initedStore.getState();
+// subscribe to store
+initedStore.subscribe((action, state, args) => {
+  // console.log(`subscriber, action: `, action, `state: `, state, `args: `, args);
+  // console.log(new Date().toISOString());
+  exposedState = state;
+});
+
+const getFieldControlValuesForPost = async (): Promise<Object> => {
+  const state = // FormFieldsStore.actions.getState();
+    exposedState;
   let toReturn = {};
   for (let fp of state.Fields) {
     if (fp.InternalName === 'Attachments') {
@@ -229,6 +269,24 @@ const getFieldControlValuesForPost = (): Object => {
         }
       }
       toReturn[`${fp.EntityPropertyName}Id`] = result;
+    } else if (fp.Type.match(/taxonomy/gi)) {
+      let result = null;
+      let validField = fp.InternalName;
+      if (fp.FormFieldValue && fp.FormFieldValue.length > 0) {
+        if (fp.IsMulti) {
+          result = fp.FormFieldValue.map(term => `-1;#${term.name}|${term.key}`).join(';#') + ';';
+          validField = fp.TaxonomyUpdateFieldEntityPropertyName;
+        } else {
+          let term = fp.FormFieldValue[0];
+          result = {
+            __metadata: { type: 'SP.Taxonomy.TaxonomyFieldValue' },
+            Label: term.name,
+            TermGuid: term.key,
+            WssId: -1
+          };
+        }
+      }
+      toReturn[validField] = result;
     } else {
       // if (fp.FormFieldValue) {
       //  toReturn[fp.EntityPropertyName] = fp.FormFieldValue;
@@ -237,12 +295,122 @@ const getFieldControlValuesForPost = (): Object => {
       toReturn[fp.EntityPropertyName] = fp.FormFieldValue;
     }
   }
+  // console.log(toReturn);
   return toReturn;
 };
 
+const getFieldControlValuesForValidatedUpdate = async (): Promise<any[]> => {
+  const state = // FormFieldsStore.actions.getState();
+    exposedState;
+  let toReturn = [];
+  for (let fp of state.Fields) {
+    let fieldValue = null;
+    if (fp.InternalName === 'Attachments') {
+      continue;
+    }
+    if (fp.Type.match(/lookup/gi)) {
+    // if (fp.Type.match(/lookup/gi) || fp.Type.match(/user/gi)) {
+      if (fp.FormFieldValue != null) {
+        if (!fp.IsMulti) {
+          fieldValue = fp.FormFieldValue.Id.toString();
+        } else {
+          if (fp.FormFieldValue.results != null && fp.FormFieldValue.results.length > 0) {
+            fieldValue = fp.FormFieldValue.results.map(r => `${r.Id};#`).join(';#');
+          }
+        }
+      }
+    } else if (fp.Type.match(/user/gi)) {
+      if (fp.FormFieldValue != null) {
+        if (!fp.IsMulti) {
+          fieldValue = `[${JSON.stringify({ Key: fp.FormFieldValue.key })}]`;
+        } else {
+          if (fp.FormFieldValue.results != null && fp.FormFieldValue.results.length > 0) {
+            let results = fp.FormFieldValue.results.map(r => {
+              return JSON.stringify({ Key: r.key });
+            }).join(',');
+            fieldValue = `[${results}]`;
+          }
+        }
+      }
+    } else if (fp.Type.match(/taxonomy/gi)) {
+      if (fp.FormFieldValue && fp.FormFieldValue.length > 0) {
+        fieldValue = fp.FormFieldValue.map(term => `${term.name}|${term.key}`).join(';');
+      }
+    } else if (fp.Type.match(/multichoice/gi)) {
+      if (fp.FormFieldValue && fp.FormFieldValue.results && fp.FormFieldValue.results.length > 0) {
+        fieldValue = fp.FormFieldValue.results.join(';#');
+      }
+    } else if (fp.Type.match(/datetime/gi)) {
+      let d = fp.FormFieldValue === null || fp.FormFieldValue === undefined ? new Date(1900, 0, 1) : new Date(Date.parse(fp.FormFieldValue));
+      fieldValue = d.format('dd/MM/yyyy HH:mm');
+    } else if (fp.Type.match(/number/gi)) {
+      if (fp.FormFieldValue) {
+        if (fp.NumberIsPercent) {
+          fieldValue = (fp.FormFieldValue * 100).toString();
+        } else {
+          fieldValue = fp.FormFieldValue;
+        }
+      }
+    } else {
+      fieldValue = fp.FormFieldValue;
+    }
+
+    if (fieldValue === undefined || fieldValue === null) {
+      fieldValue = null;
+    } else {
+      fieldValue = fieldValue.toString();
+    }
+
+    toReturn.push({
+      ErrorMessage: null,
+      FieldName: fp.EntityPropertyName,
+      FieldValue: fieldValue,
+      HasException: false
+    });
+  }
+  // console.log(toReturn);
+  return toReturn;
+};
+
+// const getNewAttachmentsToSave = (): Promise<AttachmentFileInfo[]> => {
+//   let toReturn: Promise<AttachmentFileInfo[]> = new Promise<AttachmentFileInfo[]>((resolve, reject) => {
+//     const state = FormFieldsStore.actions.getState();
+//     let filtered = state.Fields.filter(f => f.InternalName === 'Attachments');
+//     let attachmentProps: IFieldProps = filtered && filtered.length > 0 ? filtered[0] : null;
+//     if (attachmentProps.AttachmentsNewToAdd) {
+//       let individualFilePromises: Promise<AttachmentFileInfo>[] = [];
+//       attachmentProps.AttachmentsNewToAdd.forEach(na => {
+//         let individualFilePromise = new Promise<AttachmentFileInfo>((individualPromiseResolve, individualPromiseReject) => {
+//           const reader = new FileReader();
+//           reader.onload = () => {
+//             const fileAsBinaryString = reader.result;
+//             individualPromiseResolve({
+//               name: na.name,
+//               content: fileAsBinaryString
+//             } as AttachmentFileInfo);
+//           };
+//           reader.onabort = () => individualPromiseResolve(null);
+//           reader.onerror = () => individualPromiseResolve(null);
+//           reader.readAsBinaryString(na);
+//         });
+//         individualFilePromises.push(individualFilePromise);
+//       });
+//       Promise.all(individualFilePromises).then((attFileInfos: AttachmentFileInfo[]) => {
+//         resolve(attFileInfos);
+//       }).catch(e => {
+//         resolve(null);
+//       });
+//     } else {
+//       resolve(null);
+//     }
+//   });
+//   return toReturn;
+// };
+
 const getNewAttachmentsToSave = (): Promise<AttachmentFileInfo[]> => {
   let toReturn: Promise<AttachmentFileInfo[]> = new Promise<AttachmentFileInfo[]>((resolve, reject) => {
-    const state = initedStore.getState();
+    const state = // FormFieldsStore.actions.getState();
+      exposedState;
     let filtered = state.Fields.filter(f => f.InternalName === 'Attachments');
     let attachmentProps: IFieldProps = filtered && filtered.length > 0 ? filtered[0] : null;
     if (attachmentProps.AttachmentsNewToAdd) {
@@ -251,15 +419,15 @@ const getNewAttachmentsToSave = (): Promise<AttachmentFileInfo[]> => {
         let individualFilePromise = new Promise<AttachmentFileInfo>((individualPromiseResolve, individualPromiseReject) => {
           const reader = new FileReader();
           reader.onload = () => {
-            const fileAsBinaryString = reader.result;
+            const res = reader.result;
             individualPromiseResolve({
               name: na.name,
-              content: fileAsBinaryString
+              content: res
             } as AttachmentFileInfo);
           };
           reader.onabort = () => individualPromiseResolve(null);
           reader.onerror = () => individualPromiseResolve(null);
-          reader.readAsBinaryString(na);
+          reader.readAsArrayBuffer(na);
         });
         individualFilePromises.push(individualFilePromise);
       });
@@ -277,33 +445,89 @@ const getNewAttachmentsToSave = (): Promise<AttachmentFileInfo[]> => {
 
 const validateForm = (): boolean => {
   initedStore.actions.validateForm();
-  let globalState = FormFieldsStore.actions.getState();
-  return globalState.Fields.filter(f => !f.IsValid).length === 0;
+  let globalState = // FormFieldsStore.actions.getState();
+    exposedState;
+  let isValid = true;
+  if (globalState && globalState.Fields) {
+    isValid = globalState.Fields.filter(f => !f.IsValid).length === 0;
+  }
+  return isValid;
 };
 
 const saveFormData = async (): Promise<ISaveItemResult> => {
   let toResolve = {} as ISaveItemResult;
   try {
-    const globalState = FormFieldsStore.actions.getState();
-    let formDataRegularFields = FormFieldsStore.actions.getFieldControlValuesForPost();
+    const globalState = // FormFieldsStore.actions.getState();
+      exposedState;
+    let formDataRegularFields =
+      await getFieldControlValuesForValidatedUpdate();
+      // await FormFieldsStore.actions.getFieldControlValuesForPost();
+
     let itemCollection = globalState.PnPSPRest.web.lists.getById(globalState.CurrentListId).items;
-    let action: Promise<ItemUpdateResult | ItemAddResult> = null;
+    let action: Promise<any> = null;
+
+    // rewite adding as regular add with no properties and then + validateupdate
+    let currentEtag = globalState.ETag;
+    let currentItemId = globalState.CurrentItemId;
     if (globalState.CurrentMode === FormMode.New) {
-      action = itemCollection.add(formDataRegularFields);
-    } else {
-      action = itemCollection.getById(globalState.CurrentItemId).update(formDataRegularFields, globalState.ETag);
+      // action = itemCollection.add(formDataRegularFields);
+
+      // action = globalState.PnPSPRest.web.lists.getById(globalState.CurrentListId).addValidateUpdateItemUsingPath(formDataRegularFields);
+      let initialAdding: ItemAddResult = await itemCollection.add();
+      console.log(initialAdding);
+      if (initialAdding && initialAdding.data && initialAdding.data.Id) {
+        currentItemId = parseInt(initialAdding.data.Id);
+        console.log(currentItemId);
+        FormFieldsStore.actions.setItemId(currentItemId);
+      }
+    }
+      // action = itemCollection.getById(globalState.CurrentItemId).update(formDataRegularFields, globalState.ETag);
+
+    action = itemCollection.getById(currentItemId).configure({
+      headers: {
+        // 'If-Match': `${globalState.ETag}`
+        'If-Match': `${currentEtag}`
+      }
+    }).validateUpdateListItem(formDataRegularFields);
+
+    // try {
+      // debugger;
+      // let res: ItemAddResult | ItemUpdateResult = await action;
+    let res = await action;
+    if (res.ValidateUpdateListItem.results.some(f => f.HasException)) {
+      let errors = res.ValidateUpdateListItem.results.reduce((prev, current) => {
+        if (current.HasException) {
+          let props = getFieldPropsByInternalName(globalState.Fields, current.FieldName);
+          prev.push(`${props.Title}: ${current.ErrorMessage}`);
+        }
+        return prev;
+      }, []).join('<br />');
+      throw new Error(errors);
     }
 
     try {
-      let res: ItemAddResult | ItemUpdateResult = await action;
+      // console.log(res);
       toResolve.IsSuccessful = true;
-      if (res.data.Id) {
+
+      // try assigning item id
+      if (res && res.data && res.data.Id) {
         toResolve.ItemId = parseInt(res.data.Id);
       } else {
-        toResolve.ItemId = globalState.CurrentItemId;
+        toResolve.ItemId = currentItemId;
       }
+
+      // try assigning new etag
+      if (res && res.data && res.data['odata.etag']) {
+        toResolve.ETag = res.data['odata.etag'];
+      } else {
+        toResolve.ETag = globalState.ETag;
+      }
+
+      // console.log(toResolve);
+
       // once we have item id - need to set this to global state
-      initedStore.actions.setItemId(toResolve.ItemId);
+      // initedStore.actions.setItemId(toResolve.ItemId);
+      // debugger;
       let attachmentProps = getFieldPropsByInternalName(globalState.Fields, 'Attachments');
       if (attachmentProps) {
         // upload attachments, if needed
@@ -335,14 +559,16 @@ const saveFormData = async (): Promise<ISaveItemResult> => {
       // realistically this is liklely to indicate problems with network or concurrency
       // console.log(e);
       toResolve.IsSuccessful = false;
-      toResolve.Error = e.message.match(/precondition/gi) ? 'Save conflict: current changes would override recent edit(-s) made since this form was opened. Please reload the page and try again.' : e.message;
+      toResolve.Error = e.message.match(/precondition/gi) ? 'Save conflict - current changes would override recent edit(-s) made since this form was opened. Please reload the page and try again.' : e.message;
       toResolve.ItemId = -1;
+      toResolve.ETag = null;
     }
   } catch (e) {
     // console.log(e);
     toResolve.IsSuccessful = false;
-    toResolve.Error = e.message;
+    toResolve.Error = e.toString();
     toResolve.ItemId = -1;
+    toResolve.ETag = null;
   }
   return toResolve;
 };
@@ -350,6 +576,10 @@ const saveFormData = async (): Promise<ISaveItemResult> => {
 const saveFormDataExternal = async (): Promise<ISaveItemResult> => {
   initedStore.actions.setLoading(true);
   let res: ISaveItemResult = await saveFormData();
+  if (res.IsSuccessful) {
+    initedStore.actions.setEtag(res.ETag);
+    initedStore.actions.setItemId(res.ItemId);
+  }
   initedStore.actions.setLoading(false);
   return res;
 };
@@ -366,36 +596,24 @@ const setFormModeExternal = (formMode: number) => {
   initedStore.actions.setLoading(false);
 };
 
-const configurePnp = (webUrl: string) => {
-  sp.setup({
-    sp: {
-      headers: {
-        Accept: 'application/json;odata=verbose'
-      },
-      baseUrl: webUrl
-    }
-  });
-};
-
 export const FormFieldsStore = {
   // Provider: initedStore.Provider,
   Provider: enhanceProvider(initedStore.Provider),
-  Consumer: initedStore.Consumer,
+  // Consumer: initedStore.Consumer,
+  connect: initedStore.connect,
   actions: {
-    getState: initedStore.getState,
+    getState: () => {
+      return exposedState;
+    },
     initStore: initedStore.actions.initStore,
     setLoading: initedStore.actions.setLoading,
     setFormMode: (arg) => { loadingEnabledStateChange(initedStore.actions.setFormMode, arg); },
     setItemId: initedStore.actions.setItemId,
     setFieldData: initedStore.actions.setFieldData,
     addNewAttachmentInfo: initedStore.actions.addNewAttachmentInfo,
-    // addNewAttachmentInfo: (arg) => { loadingEnabledStateChange(initedStore.actions.addNewAttachmentInfo, arg); },
     removeNewAttachmentInfo: initedStore.actions.removeNewAttachmentInfo,
-    // removeNewAttachmentInfo: (arg) => { loadingEnabledStateChange(initedStore.actions.removeNewAttachmentInfo, arg); },
-    // addOrRemoveExistingAttachmentDeletion: initedStore.actions.addOrRemoveExistingAttachmentDeletion,
     addOrRemoveExistingAttachmentDeletion: (arg) => { loadingEnabledStateChange(initedStore.actions.addOrRemoveExistingAttachmentDeletion, arg); },
     clearHelperAttachmentProperties: initedStore.actions.clearHelperAttachmentProperties,
-    // clearHelperAttachmentProperties: () => { loadingEnabledStateChange(initedStore.actions.clearHelperAttachmentProperties); },
     getFieldControlValuesForPost,
     getNewAttachmentsToSave,
     saveFormData: saveFormDataExternal,
@@ -406,5 +624,6 @@ export const FormFieldsStore = {
     clearValidatorsFromField: initedStore.actions.clearValidatorsFromField,
     setFieldPropValue: initedStore.actions.setFieldPropValue,
     setFormMessage: initedStore.actions.setFormMessage
+  // tslint:disable-next-line:one-line
   } as IFormManagerActions
 };

@@ -2,17 +2,14 @@ import * as React from 'react';
 import { PrimaryButton, DefaultButton, IconButton } from 'office-ui-fabric-react/lib/Button';
 import { Panel, PanelType } from 'office-ui-fabric-react/lib/Panel';
 import { Spinner, SpinnerType } from 'office-ui-fabric-react/lib/Spinner';
-import { Label } from 'office-ui-fabric-react/lib/Label';
 import TermPicker from './TermPicker';
-import { ITaxonomyPickerProps, ITaxonomyPickerState, IPickerTerms, IPickerTerm } from './interfaces';
-import styles from './TaxonomyPicker.module.scss';
-// import { sortBy, uniqBy, cloneDeep, isEqual } from '@microsoft/sp-lodash-subset';
+import { IPickerTerms, IPickerTerm } from './interfaces';
 import TermParent from './TermParent';
 import FieldErrorMessage from './ErrorMessage';
 import SPTermStorePickerService from './SPTermStorePickerService';
-import * as TermService from './ISPTermStorePickerService';
 import { IFieldProps } from '../../interfaces';
 import { BaseFieldRenderer } from '../BaseFieldRenderer';
+import './TaxonomyPicker.css';
 
 /**
  * Image URLs / Base64
@@ -23,23 +20,27 @@ export const GROUP_IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQ
 export const TERMSET_IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAACaSURBVDhPrZLRCcAgDERdpZMIjuQA7uWH4CqdxMY0EQtNjKWB0A/77sxF55SKMTalk8a61lqCFqsLiwKac84ZRUUBi7MoYHVmAfjfjzE6vJqZQfie0AcwBQVW8ATi7AR7zGGGNSE6Q2cyLSPIjRswjO7qKhcPDN2hK46w05wZMcEUIG+HrzzcrRsQBIJ5hS8C9fGAPmRwu/9RFxW6L8CM4Ry8AAAAAElFTkSuQmCC'; // /_layouts/15/Images/EMMTermSet.png
 export const TERM_IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAACzSURBVDhPY2AYNKCoqIgTiOcD8X8S8F6wB4Aa1IH4akNDw+mPHz++/E8EuHTp0jmQRSDNCcXFxa/XrVt3gAh9KEpgBvx/9OjRLVI1g9TDDYBp3rlz5//Kysr/IJoYgGEASPPatWsbQDQxAMOAbdu2gZ0FookBcAOePHlyhxgN6GqQY+Hdhg0bDpJqCNgAaDrQAnJuNDY2nvr06dMbYgw6e/bsabgBUEN4yEiJ2wdNViLfIQC3sTh2vtJcswAAAABJRU5ErkJggg==';
 
-/**
- * Renders the controls for PropertyFieldTermPicker component
- */
-// export class TaxonomyPicker extends React.Component<ITaxonomyPickerProps, ITaxonomyPickerState> {
 export class FieldTaxonomyRenderer extends BaseFieldRenderer {
+  private isFieldMounted = false;
   private termsService: SPTermStorePickerService;
   private previousValues: IPickerTerms = [];
   private cancel: boolean = true;
 
-  /**
-   * Constructor method
-   */
   constructor(props: IFieldProps) {
     super(props);
 
+    let unprocessedCurrentValue = [];
+    if (props.FormFieldValue) {
+      if (props.IsMulti) {
+        unprocessedCurrentValue = props.FormFieldValue.results;
+      } else {
+        unprocessedCurrentValue = [props.FormFieldValue];
+      }
+    }
+
     this.state = {
-      activeNodes: props.FormFieldValue || [],
+      currentValue: [],
+      unprocessedInitialValue: unprocessedCurrentValue,
       termSetAndTerms: null,
       loaded: false,
       openPanel: false,
@@ -51,55 +52,86 @@ export class FieldTaxonomyRenderer extends BaseFieldRenderer {
     this.onSave = this.onSave.bind(this);
     this.termsChanged = this.termsChanged.bind(this);
     this.termsFromPickerChanged = this.termsFromPickerChanged.bind(this);
+    this.trySetValue = this.trySetValue.bind(this);
   }
 
-  /**
-   * componentWillMount lifecycle hook
-   */
-  public componentWillMount(): void {
-    this.setState({
-      activeNodes: this.props.FormFieldValue || []
-    });
+  public componentDidMount() {
+    this.isFieldMounted = true;
+    if (!this.state.termSetAndTerms) {
+      this.termsService = new SPTermStorePickerService(this.props);
+      this.termsService.getAllTerms(this.props.TaxonomyTermSetId).then((response) => {
+        if (response !== null) {
+          // console.log(response);
+          // console.log(this.props.FormFieldValue);
+          // debugger;
+
+          if (this.isFieldMounted) {
+            this.setState({
+              termSetAndTerms: response,
+              loaded: true
+            }, () => {
+              this.trySetProcessedValue();
+            });
+          }
+        }
+      });
+    } else {
+      this.trySetProcessedValue();
+    }
   }
 
-  protected renderNewForm() {
-    return this.renderNewOrEditForm();
+  public componentWillUnmount() {
+    this.isFieldMounted = false;
   }
 
-  protected renderEditForm() {
-    return this.renderNewOrEditForm();
+  protected renderNewForm(props: IFieldProps) {
+    return this.renderNewOrEditForm(props);
+  }
+
+  protected renderEditForm(props: IFieldProps) {
+    return this.renderNewOrEditForm(props);
   }
 
   protected renderDispForm() {
-    return <div>...</div>;
+    if (this.props.FormFieldValue && this.props.FormFieldValue.length > 0) {
+      return (
+        <React.Fragment>
+          {this.props.FormFieldValue.map(v => <div key={v.key}>{v.name}</div>)}
+        </React.Fragment>
+      );
+    }
+    return null;
   }
 
-  /**
-   * Renders the SPListpicker controls with Office UI  Fabric
-   */
-  protected renderNewOrEditForm(): JSX.Element {
+  protected renderNewOrEditForm(props: IFieldProps): JSX.Element {
     return (
       <div>
-        <table className={styles.termFieldTable}>
-          <tbody>
-            <tr>
-              <td>
-                <TermPicker
-                  disabled={false}
-                  fieldProps={this.props}
-                  value={this.state.activeNodes}
-                  isTermSetSelectable={false}
-                  onChanged={this.termsFromPickerChanged}
-                  allowMultipleSelections={this.props.IsMulti}
-                  disabledTermIds={null}
-                  disableChildrenOfDisabledParents={null} />
-              </td>
-              <td className={styles.termFieldRow}>
-                <IconButton iconProps={{ iconName: 'Tag' }} onClick={this.onOpenPanel} />
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        {
+          /* Show spinner in the panel while retrieving terms */
+          !this.state.loaded ?
+            <Spinner type={SpinnerType.normal} /> :
+            <table className={`termFieldTable`}>
+              <tbody>
+                <tr>
+                  <td className={`termFieldRowPicker`}>
+                    <TermPicker
+                      disabled={false}
+                      fieldProps={props}
+                      allTerms={this.state.termSetAndTerms ? this.state.termSetAndTerms.Terms : []}
+                      value={this.state.currentValue}
+                      isTermSetSelectable={false}
+                      onChanged={this.termsFromPickerChanged}
+                      allowMultipleSelections={props.IsMulti}
+                      disabledTermIds={null}
+                      disableChildrenOfDisabledParents={null} />
+                  </td>
+                  <td className={`termFieldRowIcon`}>
+                    <IconButton iconProps={{ iconName: 'Tag' }} onClick={this.onOpenPanel} />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+        }
 
         <FieldErrorMessage errorMessage={this.state.errorMessage} />
 
@@ -109,34 +141,29 @@ export class FieldTaxonomyRenderer extends BaseFieldRenderer {
           onDismiss={this.onClosePanel}
           isLightDismiss={true}
           type={PanelType.medium}
-          headerText={`...`}
+          headerText={this.state.termSetAndTerms ? this.state.termSetAndTerms.Name : ''}
           onRenderFooterContent={() => {
             return (
-              <div className={styles.actions}>
+              <div className={`actions`}>
                 <PrimaryButton iconProps={{ iconName: 'Save' }} text='Save' value='Save' onClick={this.onSave} />
                 <DefaultButton iconProps={{ iconName: 'Cancel' }} text='Cancel' value='Cancel' onClick={this.onClosePanel} />
               </div>
             );
           }}>
-
           {
-            /* Show spinner in the panel while retrieving terms */
-            this.state.loaded === false ? <Spinner type={SpinnerType.normal} /> : ''
-          }
-          {
-            this.state.loaded === true && this.state.termSetAndTerms && (
+            this.state.openPanel && this.state.loaded && this.state.termSetAndTerms && (
               <div key={this.state.termSetAndTerms.Id} >
-                <h3>{this.state.termSetAndTerms.Name}</h3>
+                {/* <h3>{this.state.termSetAndTerms.Name}</h3> */}
                 <TermParent
-                  anchorId={this.props.TaxonomyAnchorId}
+                  anchorId={props.TaxonomyAnchorId}
                   autoExpand={null}
                   termset={this.state.termSetAndTerms}
                   isTermSetSelectable={false}
-                  activeNodes={this.state.activeNodes}
+                  activeNodes={this.state.currentValue}
                   disabledTermIds={null}
                   disableChildrenOfDisabledParents={null}
                   changedCallback={this.termsChanged}
-                  multiSelection={this.props.IsMulti ? true : false} />
+                  multiSelection={props.IsMulti ? true : false} />
               </div>
             )
           }
@@ -145,147 +172,107 @@ export class FieldTaxonomyRenderer extends BaseFieldRenderer {
     );
   }
 
-  /**
-   * componentWillUpdate lifecycle hook
-   */
-  // public componentDidUpdate(prevProps: ITaxonomyPickerProps): void {
-  //   // Check if the initial values objects are not equal, if that is the case, data can be refreshed
-  //   if (!isEqual(this.props.initialValues, prevProps.initialValues)) {
-  //     this.setState({
-  //       activeNodes: this.props.initialValues || []
-  //     });
-  //   }
-  // }
+  private trySetProcessedValue() {
+    if (!this.state.termSetAndTerms) {
+      return;
+    }
 
-  /**
-   * Loads the list from SharePoint current web site
-   */
-  private loadTermStores(): void {
-    this.termsService = new SPTermStorePickerService(this.props);
-    this.termsService.getAllTerms(this.props.TaxonomyTermSetId).then((response) => {
-      // Check if a response was retrieved
-      if (response !== null) {
-        this.setState({
-          termSetAndTerms: response,
-          loaded: true
-        });
-      } else {
-        this.setState({
-          termSetAndTerms: null,
-          loaded: true
-        });
+    let currentValue = this.state.currentValue;
+    if (this.state.unprocessedInitialValue) {
+      currentValue = this.state.unprocessedInitialValue.reduce((prevResults, iv) => {
+        let terms = this.state.termSetAndTerms.Terms.filter(t => t.key === iv.TermGuid || t.key === iv.key);
+        if (terms && terms.length > 0) {
+          prevResults.push(terms[0]);
+        }
+        return prevResults;
+      }, []);
+      if (currentValue.length === 0) {
+        currentValue = this.props.FormFieldValue;
       }
-    });
-    // taxonomy.getDefaultSiteCollectionTermStore().getTermSetsByName()
+    } else {
+      currentValue = this.props.FormFieldValue;
+    }
+
+    if (this.isFieldMounted) {
+      this.setState({ currentValue }, () => {
+        this.trySetValue(this.state.currentValue);
+      });
+    }
   }
 
-  /**
-   * Open the right Panel
-   */
   private onOpenPanel(): void {
     // Store the current code value
-    this.previousValues = [...this.state.activeNodes]; // cloneDeep(this.state.activeNodes);
+    this.previousValues = [...this.state.currentValue];
     this.cancel = true;
-
-    this.loadTermStores();
-
-    this.setState({
-      openPanel: true,
-      loaded: false
-    });
+    this.setState({ openPanel: true });
   }
 
-  /**
-   * Close the panel
-   */
   private onClosePanel(): void {
+    let newState: any = {
+      openPanel: false
+    };
 
-    this.setState(() => {
-      const newState: ITaxonomyPickerState = {
-        openPanel: false,
-        loaded: false
-      };
-
-      // Check if the property has to be reset
-      if (this.cancel) {
-        newState.activeNodes = this.previousValues;
-      }
-
-      return newState;
+    // Check if the property has to be reset
+    if (this.cancel) {
+      newState.currentValue = this.previousValues;
+    }
+    this.setState(newState, () => {
+      this.trySetValue(this.state.currentValue);
     });
   }
 
-  /**
-   * On save click action
-   */
   private onSave(): void {
     this.cancel = false;
     this.onClosePanel();
-    // Trigger the onChange event
-    // this.props.onChange(this.state.activeNodes);
   }
 
-  /**
-   * Clicks on a node
-   * @param node
-   */
-  private termsChanged(term: TermService.ITerm, checked: boolean): void {
-
-    let activeNodes = this.state.activeNodes;
+  private termsChanged(term: IPickerTerm, checked: boolean): void {
+    let currentValue = this.state.currentValue;
     if (typeof term === 'undefined' || term === null) {
       return;
     }
 
     // Term item to add to the active nodes array
-    const termItem = {
-      name: term.Name,
-      key: term.Id,
-      path: term.PathOfTerm,
-      termSet: term.TermSet.Id
-    };
+    const termItem = term;
 
     // Check if the term is checked or unchecked
     if (checked) {
       // Check if it is allowed to select multiple terms
       if (this.props.IsMulti) {
         // Add the checked term
-        activeNodes.push(termItem);
+        currentValue.push(termItem);
         // Filter out the duplicate terms
         // activeNodes = uniqBy(activeNodes, 'key');
       } else {
         // Only store the current selected item
-        activeNodes = [termItem];
+        currentValue = [termItem];
       }
     } else {
       // Remove the term from the list of active nodes
-      activeNodes = activeNodes.filter(item => item.key !== term.Id);
+      currentValue = currentValue.filter(item => item.key !== term.key);
     }
     // Sort all active nodes
     // activeNodes = sortBy(activeNodes, 'path');
     // Update the current state
     this.setState({
-      activeNodes: activeNodes
+      currentValue: currentValue
     });
   }
 
   private termsFromPickerChanged(terms: IPickerTerms) {
-    // this.props.onChange(terms);
-    this.setState({
-      activeNodes: terms
+    this.setState({ currentValue: terms }, () => {
+      this.trySetValue(terms);
     });
   }
 
-  /**
-   * Gets the given node position in the active nodes collection
-   * @param node
-   */
-  private getSelectedNodePosition(node: IPickerTerm): number {
-    for (let i = 0; i < this.state.activeNodes.length; i++) {
-      if (node.key === this.state.activeNodes[i].key) {
-        return i;
+  private trySetValue(terms: IPickerTerms) {
+    let toSet = [];
+    if (terms) {
+      for (const term of terms) {
+        toSet.push(`-1;#${term.name}|${term.key}`);
       }
     }
-    return -1;
+    // this.trySetChangedValue(toSet.join(';#'));
+    this.trySetChangedValue(terms);
   }
-
 }

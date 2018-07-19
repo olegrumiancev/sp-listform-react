@@ -1,4 +1,4 @@
-import { ITermSet, ITerm } from './ISPTermStorePickerService';
+// import { ITermSet, ITerm } from './ISPTermStorePickerService';
 import { IFieldProps } from '../../interfaces';
 
 export interface ITaxonomyPickerProps {
@@ -25,28 +25,28 @@ export interface ITaxonomyPickerProps {
  */
 export interface ITaxonomyPickerState {
 
-  termSetAndTerms?: ITermSet;
+  termSetAndTerms?: IPickerTermSet;
   errorMessage?: string;
   openPanel?: boolean;
   loaded?: boolean;
-  activeNodes?: IPickerTerms;
+  currentValue?: IPickerTerms;
 }
 
 export interface ITermChanges {
-  changedCallback: (term: ITerm, checked: boolean) => void;
+  changedCallback: (term: IPickerTerm, checked: boolean) => void;
   activeNodes?: IPickerTerms;
   disabledTermIds?: string[];
   disableChildrenOfDisabledParents?: boolean;
 }
 
 export interface ITermParentProps extends ITermChanges {
-  termset: ITermSet;
+  termset: IPickerTermSet;
   multiSelection: boolean;
   anchorId?: string;
   isTermSetSelectable?: boolean;
 
   autoExpand: () => void;
-  termSetSelectedChange?: (termSet: ITermSet, isChecked: boolean) => void;
+  termSetSelectedChange?: (termSet: IPickerTermSet, isChecked: boolean) => void;
 }
 
 export interface ITermParentState {
@@ -57,7 +57,7 @@ export interface ITermParentState {
 
 export interface ITermProps extends ITermChanges {
   termset: string;
-  term: ITerm;
+  term: IPickerTerm;
   multiSelection: boolean;
   disabled: boolean;
 }
@@ -74,7 +74,8 @@ export interface ITermPickerProps {
   // termPickerHostProps: ITaxonomyPickerProps;
   fieldProps: IFieldProps;
   disabled: boolean;
-  value: IPickerTerms;
+  value: IPickerTerm[];
+  allTerms: IPickerTerm[];
   allowMultipleSelections: boolean;
   isTermSetSelectable?: boolean;
   disabledTermIds?: string[];
@@ -86,9 +87,21 @@ export interface ITermPickerProps {
 export interface IPickerTerm {
   name: string;
   key: string;
+  parentId: string;
+  customSortOrder: string;
   path: string;
+  pathDepth: number;
   termSet: string;
   termSetName?: string;
+  isDeprecated: boolean;
+}
+
+export interface IPickerTermSet {
+  Id: string;
+  Name: string;
+  Description: string;
+  CustomSortOrder: string;
+  Terms?: IPickerTerm[];
 }
 
 export interface IPickerTerms extends Array<IPickerTerm> { }

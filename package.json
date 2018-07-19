@@ -38,8 +38,9 @@
     "@types/react": "^16.3.16",
     "@types/sharepoint": "^2016.1.1",
     "eslint-config-standard": "^11.0.0",
+    "react-waterfall": "^4.0.0-beta.4",
+    "source-map-explorer": "^1.5.0",
     "sp-build-tasks": "^2.0.2",
-    "tslint-config-standard": "^7.0.0",
-    "react-waterfall": "^3.0.7"
+    "tslint-config-standard": "^7.0.0"
   }
 }

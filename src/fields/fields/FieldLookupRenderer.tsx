@@ -61,7 +61,7 @@ export class FieldLookupRenderer extends BaseFieldRenderer {
         ref={c => {
           if (c != null) {
             this.tagPicker = c;
-            this.processTagItemsChange(c.items);
+            // this.processTagItemsChange(c.items);
           }
         }}
       />

@@ -37,43 +37,20 @@ export default class ListForm extends React.Component<IListFormProps, IListFormP
   }
 
   public render() {
+    let ListFormStateless = FormFieldsStore.connect(state => {
+      let enhancedState = {
+        ...state,
+        closeForm: this.closeForm,
+        getButtonsByFormMode: this.getButtonsByFormMode
+      };
+      return enhancedState;
+    })(ListFormInternal);
     return (
       <div className='formContainer'>
         <FormFieldsStore.Provider>
-          <FormFieldsStore.Consumer mapStateToProps={(state: IFormManagerProps) => ({
-            Fields: state.Fields,
-            IsLoading: state.IsLoading,
-            CurrentMode: state.CurrentMode
-          })}>
-            {({ Fields, IsLoading, CurrentMode, actions }) => {
-              return (
-                <div>
-                  <FormHeader CurrentMode={CurrentMode as number} Fields={Fields} />
-                  <CommandBar isSearchBoxVisible={false} key='commandBar'
-                    items={this.getButtonsByFormMode(CurrentMode)}
-                    farItems={[
-                      {
-                        className: 'ms-bgColor-neutral',
-                        key: 'close',
-                        name: 'Close',
-                        iconProps: {
-                          iconName: 'RemoveFilter'
-                        },
-                        onClick: () => {
-                          this.closeForm();
-                        }
-                      }
-                    ]}
-                  />
-                  {IsLoading ?
-                    <div className='formContainer' style={{ padding: '5em' }}><Spinner title='Loading...' /></div> :
-                    this.getFieldsRenderPart(Fields)}
-                </div>
-              );
-            }}
-            </FormFieldsStore.Consumer>
-          </FormFieldsStore.Provider>
-        </div>
+          <ListFormStateless />
+        </FormFieldsStore.Provider>
+      </div>
     );
   }
 
@@ -83,31 +60,8 @@ export default class ListForm extends React.Component<IListFormProps, IListFormP
       this.state.CurrentMode, this.state.CurrentItemId);
   }
 
-  private getFieldsRenderPart(fields: IFieldProps[]): JSX.Element {
-    if (!fields) {
-      return null;
-    }
-
-    return <React.Fragment>
-      {fields.map(f => (
-        <div className='formRow' key={`formRow_${f.InternalName}`}>
-          <div className='rowLabel' key={`formLabelContainer_${f.InternalName}`}>
-            <Label key={`label_${f.InternalName}`}>
-              {f.Title}
-              {f.IsRequired ? <span key={`label_required_${f.InternalName}`} style={{ color: 'red' }}> *</span> : null}
-            </Label>
-          </div>
-          <div className='rowField' key={`formFieldContainer_${f.InternalName}`}>
-            <FormField key={`formfield_${f.InternalName}`} InternalName={f.InternalName} FormMode={f.CurrentMode} />
-            {/* <FormField key={`formfield_${f.InternalName}`} {...f} /> */}
-          </div>
-        </div>
-      ))}
-    </React.Fragment>;
-  }
-
   private closeForm() {
-    console.log('Closing the form.');
+    //  console.log('Closing the form.');
   }
 
   private getButtonsByFormMode(mode: number) {
@@ -124,7 +78,7 @@ export default class ListForm extends React.Component<IListFormProps, IListFormP
         if (isValid) {
           FormFieldsStore.actions.saveFormData().then(res => {
             if (res.IsSuccessful) {
-              this.setState({ CurrentItemId: res.ItemId });
+              // this.setState({ CurrentItemId: res.ItemId });
               FormFieldsStore.actions.setFormMode(FormMode.Display);
             } else {
               // we need to do show save error dialog
@@ -157,3 +111,43 @@ export default class ListForm extends React.Component<IListFormProps, IListFormP
     return mode === FormMode.Display ? [commandBarItemEdit] : [commandBarItemSave];
   }
 }
+
+export const ListFormInternal = (props) => {
+  // console.log(props);
+  return <div>
+  <FormHeader CurrentMode={props.CurrentMode as number} Fields={props.Fields} />
+  <CommandBar isSearchBoxVisible={false} key='commandBar'
+    items={props.getButtonsByFormMode(props.CurrentMode)}
+    farItems={[
+      {
+        className: 'ms-bgColor-neutral',
+        key: 'close',
+        name: 'Close',
+        iconProps: {
+          iconName: 'RemoveFilter'
+        },
+        onClick: props.closeForm()
+      }
+    ]}
+  />
+  {props.IsLoading ?
+    <div className='formContainer' style={{ padding: '5em' }}><Spinner title='Loading...' /></div> :
+    <React.Fragment>
+    {props.Fields.map(f => (
+      <div className='formRow' key={`formRow_${f.InternalName}`}>
+        <div className='rowLabel' key={`formLabelContainer_${f.InternalName}`}>
+          <Label key={`label_${f.InternalName}`}>
+            {f.Title}
+            {f.IsRequired ? <span key={`label_required_${f.InternalName}`} style={{ color: 'red' }}> *</span> : null}
+          </Label>
+        </div>
+        <div className='rowField' key={`formFieldContainer_${f.InternalName}`}>
+          <FormField key={`formfield_${f.InternalName}`} InternalName={f.InternalName} FormMode={f.CurrentMode} />
+          {/* <FormField key={`formfield_${f.InternalName}`} {...f} /> */}
+        </div>
+      </div>
+    ))}
+    </React.Fragment>
+  }
+</div>;
+};

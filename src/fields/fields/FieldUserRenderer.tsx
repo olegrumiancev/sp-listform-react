@@ -58,7 +58,33 @@ export class FieldUserRenderer extends BaseFieldRenderer {
         }
       });
     }
-    this.saveDataInternal();
+
+    // get the login names of selected user values
+    if (this.state.currentSelectedItems && this.state.currentSelectedItems.length > 0) {
+      let promises: Promise<any>[] = [];
+      let newValues = [];
+      for (let sv of this.state.currentSelectedItems) {
+        let p = this.props.pnpSPRest.web.siteUsers.getById(sv.id).get();
+        promises.push(p);
+        p.then(r => {
+          console.log(r);
+          newValues.push({
+            id: r.Id,
+            key: r.PrincipalType === 4 ? r.Title : r.LoginName,
+            text: r.Title
+          });
+          // console.log(r);
+        });
+      }
+      Promise.all(promises).then(() => {
+        if (this.isFieldMounted) {
+          this.setState({ currentSelectedItems: newValues }, () => {
+            this.saveDataInternal();
+          });
+        }
+      });
+    }
+    // this.saveDataInternal();
   }
 
   protected renderNewForm() {
@@ -90,7 +116,9 @@ export class FieldUserRenderer extends BaseFieldRenderer {
       defaultSelectedItems={this.state.currentSelectedItems}
       onResolveSuggestions={this.onFilterChanged}
       getTextFromItem={this.getTextFromItem}
-      pickerSuggestionsProps={{ searchingText: 'Searching more..' }}
+      pickerSuggestionsProps={{
+        searchingText: 'Searching more...'
+      }}
       className={'ms-PeoplePicker'}
       key={`${this.props.InternalName}_normalpicker`}
       onRemoveSuggestion={this.onRemoveSuggestion}
@@ -126,8 +154,9 @@ export class FieldUserRenderer extends BaseFieldRenderer {
     let result = [];
     let promises: Promise<WebEnsureUserResult>[] = [];
     for (let entry of items) {
+      console.log(entry);
       if (entry.id === -1) {
-        let pp = this.props.pnpSPRest.web.ensureUser(entry.loginName);
+        let pp = this.props.pnpSPRest.web.ensureUser(entry.key);
         pp.catch(e => {
           // handleError(e);
         });
@@ -135,11 +164,17 @@ export class FieldUserRenderer extends BaseFieldRenderer {
         pp.then((r: WebEnsureUserResult) => {
           result.push({
             text: r.data.Title,
-            id: r.data.Id.toString()
+            id: r.data.Id.toString(),
+            key: r.data.PrincipalType === 4 ? r.data.Title : r.data.LoginName // r.data.LoginName
           });
         });
       } else {
-        result.push(entry);
+        let selected = this.state.currentSelectedItems.filter(i => i.id.toString() === entry.id);
+        console.log(selected);
+        if (selected && selected.length > 0) {
+          selected[0].id = selected[0].id.toString();
+          result.push(selected[0]);
+        }
       }
     }
     Promise.all(promises).then(() => {
@@ -186,10 +221,12 @@ export class FieldUserRenderer extends BaseFieldRenderer {
           let result = [];
           if (entries && entries.SearchPrincipalsUsingContextWeb &&
               entries.SearchPrincipalsUsingContextWeb.results && entries.SearchPrincipalsUsingContextWeb.results.length > 0) {
+            console.log(entries.SearchPrincipalsUsingContextWeb.results);
             result = entries.SearchPrincipalsUsingContextWeb.results.map(e => ({
               text: e.DisplayName,
               id: e.PrincipalId,
-              loginName: e.LoginName
+              key: e.PrincipalType === 4 ? e.Email : e.LoginName
+              // key: e.LoginName
             }));
           }
           resolve(result);
@@ -207,10 +244,11 @@ export class FieldUserRenderer extends BaseFieldRenderer {
   }
 
   private saveDataInternal = () => {
-    let result = this.state.currentSelectedItems.map((persona: IPersonaProps) => {
+    let result = this.state.currentSelectedItems.map((persona) => {
       return {
         Title: persona.text,
-        Id: persona.id
+        Id: persona.id,
+        key: persona.key
       };
     });
 
@@ -224,7 +262,8 @@ export class FieldUserRenderer extends BaseFieldRenderer {
       if (this.state.currentSelectedItems.length > 0) {
         result = {
           Title: this.state.currentSelectedItems[0].text,
-          Id: this.state.currentSelectedItems[0].id
+          Id: this.state.currentSelectedItems[0].id,
+          key: this.state.currentSelectedItems[0].key
         };
       } else {
         result = null;

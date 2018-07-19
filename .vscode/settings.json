@@ -10,8 +10,9 @@
   "files.trimTrailingWhitespace": true,
   "editor.tabSize": 2,
   "editor.autoIndent": true,
-  "window.zoomLevel": -1,
+  "window.zoomLevel": 0,
   "git.enableSmartCommit": true,
   "git.confirmSync": false,
-  "git.autofetch": true
+  "git.autofetch": true,
+  "editor.fontFamily": "'Fantasque Sans Mono', Consolas, 'Courier New', monospace"
 }
