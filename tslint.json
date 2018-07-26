@@ -6,8 +6,6 @@
       "always",
       "ignore-interfaces"
     ],
-    "space-before-function-paren": false,
-    "radix": false,
-    "no-unsafe-finally": false
+    "space-before-function-paren": false
   }
 }

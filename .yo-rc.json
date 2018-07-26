@@ -1,9 +1,9 @@
 {
   "generator-sppp": {
-    "app.name": "sppp-list-form",
-    "sppp.version": "2.3.0",
-    "app.description": "Universal Office UI Fabric React-based list form for SharePoint lists",
-    "app.author": "Oleg Rumiancev",
+    "app.name": "sp-listform-react-3-03",
+    "sppp.version": "3.0.3",
+    "app.description": "",
+    "app.author": "",
     "conf.spFolder": "_catalogs/masterpage/spf",
     "conf.distFolder": "./dist"
   }

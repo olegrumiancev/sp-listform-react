@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
     "target": "es5",
     "module": "esnext",
     "lib": [
@@ -28,6 +27,7 @@
     "gulpfile.js",
     "build",
     "dist",
-    "tmp"
+    "tmp",
+    "cache"
   ]
 }

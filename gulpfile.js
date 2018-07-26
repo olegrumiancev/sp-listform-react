@@ -1,3 +1,5 @@
+//@ts-check
+
 /**
  * === (!) Do not modify this file directly (!) ===
  *
@@ -6,16 +8,22 @@
  *
  */
 
-'use strict';
-
-process.env.NODE_ENV = 'development';
-
 const gulp = require('gulp');
+require('dotenv').load();
 
-new(require('sp-build-tasks'))(gulp, {
-  privateConf: './config/private.json',
-  appConfig: './config/app.json',
-  taskPath: './build/tasks'
+/**
+ * You can redefine parameters in environment variables.
+ * Create or modify `.env` file in the projects' root folder with the following content:
+ *
+ * PRIVATE_JSON=./.config/private.json
+ * APP_JSON=./config/app.json
+ *
+ */
+
+new (require('sp-build-tasks').SPBuildTasks)(gulp, {
+  privateConf: process.env.PRIVATE_JSON || './config/private.json',
+  appConfig: process.env.APP_JSON || './config/app.json',
+  taskPath: './tools/tasks'
 });
 
 // === (!) Do not modify this file directly (!) ===
