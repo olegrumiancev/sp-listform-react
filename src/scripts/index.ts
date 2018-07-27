@@ -1,3 +1,6 @@
+// require('core-js/es6');
+// import 'core-js/es6';
+import 'core-js/shim';
 import * as ReactDOM from 'react-dom';
 import root from './root';
 

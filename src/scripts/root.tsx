@@ -1,4 +1,4 @@
-require('core-js/shim');
+// import 'core-js/shim';
 import * as React from 'react';
 import { sp } from '@pnp/sp';
 import { FormMode, getQueryString, executeSPQuery, IListFormProps, setupPnp } from 'sp-react-formfields/lib/interfaces';
@@ -52,10 +52,10 @@ export class RootInternal extends React.Component<{ }, { formProps: IListFormPro
     /* Include any JSX here, and also use <FormField InternalName='FieldInternalNameString' />
       to create a custom form.
       If nothing is populated in this area - ListForm component will just render all valid fields one by one as default */
-    result = (
-      <React.Fragment>
-      </React.Fragment>
-    );
+    // result = (
+    //   <React.Fragment>
+    //   </React.Fragment>
+    // );
 
     return result;
   }
