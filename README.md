@@ -15,7 +15,7 @@
 The output of this scaffolded solution will be (by default) in the ./dist folder and will contain webpacked *.JS / *.CSS and *.HTML files. The intended purpose of them is to use *.HTML files as content sources for Contenr Editor WebParts (CEWPs).
 
 The structure of scaffolded solution is
-![img](./docs/structure.jpg)
+![img](https://olegrumiancev.github.io/sp-listform-react/structure.JPG)
 You are interested in 4 folders:
 - **config** - this will contain information about your target site (collection), deployment folder in that site (like _catalogs/mycode/... or even just SiteAssets/mycode/... -- your choice!). **Fill config by calling NPM RUN CONFIG**
 - **scripts** - open root.tsx file if you want to write custom UI for your form (and not just use default one line for one field kind of deal). Look for function called **renderCustomFieldLogic** and modify it to return your custom JSX. to create form fields user **FormField** component and pass internal name as string.
@@ -81,4 +81,4 @@ $ gulp watch
 ```
 
 ### Transfomation example
-![img](./docs/transform.gif)
+![img](https://olegrumiancev.github.io/sp-listform-react/transform.gif)
