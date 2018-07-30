@@ -12,7 +12,7 @@
 
 ##### The working React components, such as **ListForm and FormField** and their interfaces are provided by a separate NPM package that I poured my soul into (so, if it's bad, don't be very harsh!), called **[sp-react-formfields](https://npmjs.com/package/sp-react-formfields)**
 ## Description
-The output of this scaffolded solution will be (by default) in the ./dist folder and will contain webpacked *.JS / *.CSS and *.HTML files. The intended purpose of them is to use *.HTML files as content sources for Contenr Editor WebParts (CEWPs).
+The output of this scaffolded solution will be (by default) in the ./dist folder and will contain webpacked *.JS / *.CSS and *.HTML files. The intended purpose of them is to use *.HTML files as content sources for Contenr Editor WebParts (CEWPs). Internally solution relies on a [@pnpjs](https://github.com/pnp/pnpjs) API.
 
 The structure of scaffolded solution is
 
@@ -20,8 +20,15 @@ The structure of scaffolded solution is
 
 You are interested in 4 folders:
 - **config** - this will contain information about your target site (collection), deployment folder in that site (like _catalogs/mycode/... or even just SiteAssets/mycode/... -- your choice!). **Fill config by calling NPM RUN CONFIG**
-- **scripts** - open root.tsx file if you want to write custom UI for your form (and not just use default one line for one field kind of deal). Look for function called **renderCustomFieldLogic** and modify it to return your custom JSX. to create form fields user **FormField** component and pass internal name as string.
+- **config / app.json** - change "spFolder" property to specofy where you want webpacked files to be uploaded
+- **scripts** - open **scripts/root.tsx** file if you want to write custom UI for your form (and not just use default one line for one field kind of deal). Look for function called **renderCustomFieldLogic** and modify it to return your custom JSX. to create form fields use **FormField / FormFieldLabel** components and pass internal name as string.
 - **webparts** - this folder contains two Handlebars template files which if you look at them are just HTML inside with some parameters substituted during build process and it is out of them that we are getting resulting *.HTML files in the ./dist folder. Once ./dist is uploaded - (we have a **gulp task** for this!!) they will be ready to be referenced in the CEWPs
+   - listform.cewp.hbs - this file is designed to be referenced in CEWPs, so good for embedding in pages
+   - listform.hbs - this file is a self-sufficient bare-bones HTML page, that can be linked to directly, just pass URL parameters
+     - listid - SharePoint list GUID (required)
+     - itemid - ID of SharePoint list item (optional)
+     - fm - Form mode integer. New: 1, Display: 2, Edit: 3 (optional, default - new form)
+     - ContentTypeId - string identifier of a SharePoint content type (optional, when specified fields will be loaded according to ctype settings)
 - **tools / tasks**  this contains two gulp tasks that I specifically wrote for "enhancing" and "de-enhancing" SharePoint list forms
    - call **gulp replaceListForm** to connect to your configured site, select a list and a Form Mode (New / Edit / Display / All) to transform
    - call **gulp restoreListForm** to connect to your configured site, select a list and Form Mode to revert back to SharePoint OOTB form
@@ -50,6 +57,14 @@ You are interested in 4 folders:
   - Lookup field renders values from correct lookup list field, if anything other than "Title" is in the settings
   - Attachment field is based on DropzoneJS and is basically a droppable area. But users can also click on the area to evoke a standard browser file select dialog
 
+
+## Main components from 'sp-react-formfields'
+
+##### - ListForm - top level element, expects information about a list passed to it
+##### - FormField - main component responsible for rendering a particula field from a SharePoint list. Only required that internal name is provided, decided what to rended internally
+##### - FormFieldLabel - complimentary component to FormField, you might want to use this to render field's Display Name. It will include red colored asterisk when field is marked as required. Also only expects an internal name to be provided
+
+
 ## Minimal path to awesome
 
 ##### 1. Fork / clone the solution
@@ -60,6 +75,8 @@ You are interested in 4 folders:
 $ npm install
 $ npm run config
 ```
+**Lastly, open config/app.json and edit "spFolder" property if you need to change the path where webpacked files will be uploaded**
+
 
 To build the solution use
 
